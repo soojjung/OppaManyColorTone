@@ -1,40 +1,210 @@
 <p align="center">
-  <a href="https://omct.web.app/" rel="noopener" target="_blank"><img src="./readme/omct-thumbnail.png" alt="logo"></a>
+  <a href="https://omct.web.app/" rel="noopener" target="_blank"><img src="./readme/omct-thumbnail.png" alt="Personal Color Self-Diagnosis Service"></a>
 </p>
 
 # Personal Color Self-Diagnosis Service
 
-## 🧐 About Project
+A free, photo-based web service that diagnoses a user's personal color in under two minutes. In production since **February 2023**, the service has run **83,000+ diagnoses** for **27,600+ annual active users**, with **83%** of traffic acquired organically through search.
 
-<p>
-Hello, we are SaekKkanDa.
+- **Live:** https://omct.web.app/
+- **Organization:** https://github.com/SaekKkanDa/OppaManyColorTone
+- **Stack:** Next.js (SSR) · TypeScript · Recoil · Firebase (Hosting, Storage, Realtime DB) · next-i18next · Sentry · GitHub Actions
 
-Have you ever wondered what your personal color is?<br>
-Getting a professional personal color diagnosis is expensive... and such a hassle.<br>
-With just one photo of yourself, find your personal color — quickly, easily, and for free!
+---
 
-</p>
+## Why This Exists
 
-> Deployment Link: https://omct.web.app/
+Professional personal color diagnosis in Korea costs ~₩70,000–150,000 and requires an in-studio appointment. The market lacked a free, accurate, mobile-friendly alternative. We built one — and shipped a product that produced verifiable adoption rather than a portfolio demo.
 
-> Github Link: https://github.com/SaekKkanDa/OppaManyColorTone
+## Impact
 
-## ✨ Installation
+Metrics measured via **Google Analytics 4**, project launch (Feb 2023) → present.
 
-```bash
-nvm use
-yarn
-yarn run dev
+| Metric | Value |
+| --- | --- |
+| Total diagnoses completed | **83,000+** |
+| Annual active users (AAU) | **27,600+** |
+| Diagnosis completion rate | **91.5%** |
+| Organic search share of traffic | **83%** |
+| Google rank for *"퍼스널컬러 테스트"* | **First page** |
+
+These numbers were earned, not seeded — there is no paid acquisition. Organic ranking + a high completion rate reflect deliberate work on SEO infrastructure and on the diagnosis flow itself.
+
+---
+
+## My Contributions (Soojin)
+
+| Area | What I owned |
+| --- | --- |
+| **Diagnosis algorithm (4 → 12 categories)** | Designed and implemented the 9-step combinatorial logic that resolves 36 color chips into one of 12 personal color categories, including the bonus-round reevaluation for borderline cases. |
+| **Internationalization (next-i18next migration)** | Drove the decision (informed by GA4 international traffic signal), evaluated alternatives, and migrated the codebase to an SSR-compatible i18n architecture with namespace splitting. Write-up: [next-i18next migration wiki](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>). |
+| **SEO metadata layer** | Built locale-aware `<head>`, Open Graph, structured data, and sitemap strategy that put the service on Google's first page for the target Korean keyword. |
+| **Taxonomy & content** | Expanded the personal color taxonomy from 4 seasonal types to 12 sub-categories, including palettes and per-category descriptive copy used in both the algorithm and the result page. |
+
+Everything below describes the system; this section is the only part claiming ownership.
+
+---
+
+## Algorithm Design — 9-Step Diagnosis for 12 Categories
+
+The original product offered the four classical seasonal categories (spring / summer / fall / winter). I expanded the taxonomy to **12 sub-categories** (each season split along hue, value, and chroma axes), then designed a 9-step diagnosis that resolves to one of those 12 deterministically and quickly.
+
+**Constraints**
+- Must run entirely client-side (no inference server, no per-request cost).
+- Must finish in ≤ 2 minutes for a casual mobile user.
+- Must be deterministic given the same inputs (no ML, no randomness in result).
+- Must keep drop-off low across nine sequential decisions.
+
+**Approach**
+- **Decision tree over 36 curated chips.** Each of the 9 steps presents a small subset chosen for **maximum information gain** against the *surviving* candidate set, not the full set. Earlier steps prune broad axes (warm vs. cool); later steps disambiguate sub-categories within a surviving season.
+- **No step maps directly to a category.** A step constrains the candidate set; the 12-category result is the intersection after all 9 steps.
+- **Bonus reevaluation round.** When the surviving set after 9 steps is non-singleton, a bonus step runs hand-picked chips designed to discriminate between *exactly* the remaining 2–3 candidates. This was the highest-leverage change for accuracy without lengthening the median session.
+- **Chip selection** was iterated against pilot session data, not chosen visually.
+
+**Outcome**
+- 12-category resolution at **91.5% completion rate** across 83K+ sessions since launch.
+- Zero server-side inference cost. Algorithm ships in the client bundle.
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    U[User Browser]
+    CDN[Firebase Hosting CDN]
+    SSR[Next.js 14 SSR]
+    I18N[next-i18next<br/>locale resolver]
+    R[Recoil<br/>9-step state machine]
+    FS[Firebase Storage<br/>uploaded photos]
+    RDB[Firebase Realtime DB<br/>diagnosis results]
+    GA[GA4]
+    SENT[Sentry]
+
+    U -->|HTTPS| CDN
+    CDN --> SSR
+    SSR --> I18N
+    SSR -->|hydrate| R
+    R -->|PUT photo| FS
+    R -->|write result| RDB
+    SSR -->|read result for /result/:id| RDB
+    U -. page + event telemetry .-> GA
+    SSR -. errors .-> SENT
+    R -. errors .-> SENT
 ```
 
-## 📙 Guide
+**Request lifecycle for a diagnosis**
 
-- [1 - Error Handling Design](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/1.-%EC%97%90%EB%9F%AC-%ED%95%B8%EB%93%A4%EB%A7%81-%EB%94%94%EC%9E%90%EC%9D%B8)
-- [2 - Deployment Automation with Github Actions](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/2.-Github-Actions%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%B0%B0%ED%8F%AC-%EC%9E%90%EB%8F%99%ED%99%94)
-- [3 - OMCT Folder Structure](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/3.-OMCT-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0)
-- [4 - Internationalization (next‐i18next)](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Client (Next.js)
+    participant S as Storage
+    participant D as Realtime DB
+    participant R as SSR /result/:id
 
-## 🙏 Contributors
+    U->>C: Upload + crop photo
+    C->>S: PUT photo
+    loop 9 diagnosis steps
+        C-->>U: Render chips (locale-aware)
+        U->>C: Select chip
+    end
+    C->>C: Resolve 12-type result<br/>(decision tree + bonus round)
+    C->>D: Persist result by id
+    U->>R: GET /result/:id (shared link)
+    R->>D: Read result
+    R-->>U: SSR HTML with locale-aware OG meta
+```
+
+## Key Engineering Decisions
+
+| Decision | Chose | Rejected | Why | Tradeoff accepted |
+| --- | --- | --- | --- | --- |
+| Rendering model | **SSR** (Next.js) | SSG, CSR | Per-locale meta and per-result OG tags must be crawlable | Cold-start latency on serverless |
+| Backend | **Firebase** (Hosting + Storage + Realtime DB) | Self-hosted Node + Postgres | Zero ops, free-tier headroom at our traffic, fast iteration with a small team | Vendor lock-in; fan-out and egress cost would dominate at higher scale |
+| Client state | **Recoil** | Redux, Zustand | Atom-level granularity fits a 9-step flow where each step owns local state but several derived selectors depend on the running candidate set | Recoil's maintenance trajectory is uncertain |
+| i18n | **next-i18next** | next-intl, custom | Mature SSR story, namespace splitting that keeps per-route payloads small, drop-in for the existing Pages-router code | Heavier configuration than next-intl |
+| Result inference | **Client-side decision tree** | Server-side classifier, ML model | Deterministic, free to run, no PII leaves the device beyond the photo the user already uploaded | No room for personalization based on cross-session data |
+
+## Technical Challenges & Learnings
+
+### 1. Designing the 9-step state machine
+
+The diagnosis is a constrained search over 12 candidate categories using 9 binary/ternary signals. Two non-obvious problems surfaced:
+
+- **Step ordering matters.** Putting a high-information-gain step too early collapses the candidate set, leaving later steps redundant. Putting it too late means later steps waste user attention on a question whose answer is already implied. I ordered steps to keep entropy of the surviving set roughly even across the session.
+- **Borderline cases hurt accuracy more than length hurts drop-off.** Adding a bonus reevaluation round (only triggered when the surviving set is non-singleton) traded ~10 seconds of median session time on borderline users for a measurable accuracy gain on the population the original 9 steps couldn't disambiguate.
+
+**Learning.** Treat the diagnosis as a decision tree against a *surviving* candidate set, not a classifier mapping (chip → category). The chip selection problem then becomes information-gain on the live subset, which is a much sharper formulation.
+
+### 2. Internationalization as a data-driven product decision
+
+GA4 surfaced a non-trivial fraction of overseas sessions early in the service's life. That signal — not a roadmap meeting — is what motivated the i18n work. I evaluated **next-intl** and **next-i18next**, chose **next-i18next** for its mature SSR story (we needed locale-aware `<head>` for SEO), and migrated the existing strings to namespaced JSON split by route. The migration shipped without regressions because the existing Pages-router structure mapped cleanly onto next-i18next's namespace model.
+
+**Learning.** "Should we internationalize?" is a product question that should be answered with traffic data. The library choice is downstream of how you render (SSR vs. CSR), not the other way around.
+
+### 3. SEO to Google's first page
+
+Ranking a free Korean-language service on Google's first page for *"퍼스널컬러 테스트"* required treating SEO as engineering, not marketing:
+
+- **Per-locale `<head>` and Open Graph** generated at SSR time so each locale is independently crawlable.
+- **Structured data** so Google understands the page as a tool, not an article.
+- **Sitemap + robots** aligned to the i18n routing scheme.
+- **Result pages are SSR-rendered** by `/result/[id]` so shared links carry crawlable meta — important because organic traffic is largely word-of-mouth shares.
+
+The result — 83% of inbound traffic now arrives via organic search — is the single largest contributor to our zero-CAC growth model.
+
+### 4. Operating in production for 3+ years on Firebase
+
+Running a real service exposed tradeoffs that aren't obvious from a tutorial:
+
+- **Firebase Storage egress** is the cost variable that scales fastest with usage; cache control and image optimization are not optional.
+- **Realtime DB fan-out** would not survive a 10× scale event without restructuring the result schema. We have not hit that ceiling, but I now read every "use Firebase" decision through that lens.
+- **Sentry release tracking** keeps post-deploy regressions in the right blast radius; without it, a 91.5% completion rate is impossible to maintain because regressions look identical to user drop-off in GA4 alone.
+
+## Tech Stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 14 (Pages router, SSR) |
+| Language | TypeScript |
+| Styling | styled-components |
+| State | Recoil |
+| Hosting / Backend | Firebase Hosting, Storage, Realtime DB |
+| i18n | next-i18next |
+| Monitoring | Sentry (errors) + GA4 (product) |
+| CI/CD | GitHub Actions → Firebase CLI |
+| Misc | Spline (3D landing), html2canvas (result share), Kakao SDK |
+
+## Deployment & Observability
+
+- **Branch-gated deploys.** Pushes to `production` trigger a GitHub Actions pipeline that injects environment secrets, builds with the Next.js production target, and deploys to the `live` Firebase Hosting channel. `develop` and feature branches do not touch the live domain.
+- **Error budget.** All routes report to Sentry with release tags. Per-route error rate is the gate for shipping the next change.
+- **Product telemetry.** GA4 captures every step transition in the 9-step flow so completion rate and step-level drop-off are first-class metrics, not derived guesses.
+
+## Local Development
+
+```bash
+nvm use      # pin Node version from .nvmrc
+yarn         # install dependencies
+yarn dev     # start Next.js dev server
+
+yarn build   # production build
+yarn lint    # eslint
+```
+
+## Documentation
+
+- [Error Handling Design](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/1.-%EC%97%90%EB%9F%AC-%ED%95%B8%EB%93%A4%EB%A7%81-%EB%94%94%EC%9E%90%EC%9D%B8)
+- [Deployment Automation with GitHub Actions](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/2.-Github-Actions%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%B0%B0%ED%8F%AC-%EC%9E%90%EB%8F%99%ED%99%94)
+- [Project Folder Structure](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/3.-OMCT-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0)
+- [Internationalization (next-i18next)](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>)
+
+---
+
+## Team
+
+Built with team **SaekKkanDa**. My contributions are itemized above; collaborators below owned the areas not listed in that section.
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <table>
@@ -93,82 +263,4 @@ yarn run dev
     </tr>
   </tbody>
 </table>
-
 <!-- ALL-CONTRIBUTORS-LIST:END -->
-
-## 🛠 Stack
-
-- Next.js
-- TypeScript
-- styled-components
-- Recoil
-- Firebase
-- Github actions
-- Sentry
-- spline
-- i18next
-
-## 🧑‍💼 Roles & Responsibilities
-
-### [Soojin](https://github.com/soojjung)
-
-- Personal Color Content Planning
-  Expanded to 12 personal color types, including color choices and descriptive text for each type
-
-- [Internationalization (i18n) Support🔗](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>)
-  Migrated to a new internationalization library (next-i18next)
-
-- [SEO Meta Tags🔗](https://github.com/SaekKkanDa/OppaManyColorTone/pull/247)
-
-### [Seoltang](https://github.com/seoltang)
-
-- [Color Selection Result Logic🔗](https://github.com/SaekKkanDa/OppaManyColorTone/pull/125)
-
-- [SEO Improvements🔗](https://github.com/SaekKkanDa/OppaManyColorTone/pull/247)
-
-- [Next.js Image & Font Optimization🔗](https://github.com/SaekKkanDa/OppaManyColorTone/pull/231)
-
-- 3D Image Integration
-  Added 3D images to the landing page (using Spline library)
-
-### [Coco](https://github.com/zwonkim)
-
-- Color Selection Logic
-  Designed and implemented the color selection logic, a core feature of the personal color diagnosis service
-- [Internationalization (i18n) Support🔗](https://github.com/SaekKkanDa/OppaManyColorTone/pull/226)
-  Added multi-language support to enable easy access for international users, with global expansion in mind
-
-- [Color Chip Selection Interaction🔗](https://github.com/SaekKkanDa/OppaManyColorTone/issues/264)
-  Added animations to the color selection process to reduce mid-session drop-off rates and enhance user engagement
-
-### [Jun](https://github.com/hyeongjun3)
-
-- Firebase Communication Module
-  Developed modules for communicating with Firebase Storage and APIs
-
-- [Personal Color Proxy Test Feature🔗](https://github.com/SaekKkanDa/OppaManyColorTone/issues/217)
-  Developed a feature allowing others to take the personal color test on your behalf using your photo
-
-- [CI/CD🔗](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/2.-Github-Actions%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%B0%B0%ED%8F%AC-%EC%9E%90%EB%8F%99%ED%99%94)
-  Built CI/CD pipeline using Firebase CLI and Github Actions
-
-- [Error Handling Design🔗](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/1.-%EC%97%90%EB%9F%AC-%ED%95%B8%EB%93%A4%EB%A7%81-%EB%94%94%EC%9E%90%EC%9D%B8)
-  Designed an architecture where handleable errors are dealt with contextually, while unhandled errors are collected via Sentry following defined conventions
-
-## 🐞 Troubleshooting
-
-- [html2canvas Library Save Issue🔗](https://github.com/SaekKkanDa/OppaManyColorTone/issues/221)
-  Celebrity photos breaking when saving result images
-
-- i18next & Firebase CLI Deployment Internal Server Error
-  Documentation to be written
-
-- Cross-Browser Issues
-  Issues with features like Native Share API and saving HTML as images behaving differently across devices and browsers
-
-## 📌 Improvements (TODO)
-
-### Google AdSense
-
-- Service monetization and revenue generation
-- Seamlessly integrated ads that blend naturally into the UX
