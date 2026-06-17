@@ -10,6 +10,10 @@ A free, photo-based web service that diagnoses a user's personal color in under 
 - **Organization:** https://github.com/SaekKkanDa/OppaManyColorTone
 - **Stack:** Next.js (SSR) · TypeScript · Recoil · Firebase (Hosting, Storage, Realtime DB) · next-i18next · Sentry · GitHub Actions
 
+### Demo
+
+https://github.com/user-attachments/assets/c259747b-bc95-4d82-b200-7acf3f078216
+
 ---
 
 ## Why This Exists
@@ -20,13 +24,13 @@ Professional personal color diagnosis in Korea costs ~₩70,000–150,000 and re
 
 Metrics measured via **Google Analytics 4**, project launch (Feb 2023) → present.
 
-| Metric | Value |
-| --- | --- |
-| Total diagnoses completed | **83,000+** |
-| Annual active users (AAU) | **27,600+** |
-| Diagnosis completion rate | **91.5%** |
-| Organic search share of traffic | **83%** |
-| Google rank for *"퍼스널컬러 테스트"* | **First page** |
+| Metric                                | Value          |
+| ------------------------------------- | -------------- |
+| Total diagnoses completed             | **83,000+**    |
+| Annual active users (AAU)             | **27,600+**    |
+| Diagnosis completion rate             | **91.5%**      |
+| Organic search share of traffic       | **83%**        |
+| Google rank for _"퍼스널컬러 테스트"_ | **First page** |
 
 These numbers were earned, not seeded — there is no paid acquisition. Organic ranking + a high completion rate reflect deliberate work on SEO infrastructure and on the diagnosis flow itself.
 
@@ -34,12 +38,12 @@ These numbers were earned, not seeded — there is no paid acquisition. Organic 
 
 ## My Contributions (Soojin)
 
-| Area | What I owned |
-| --- | --- |
-| **Diagnosis algorithm (4 → 12 categories)** | Designed and implemented the 9-step combinatorial logic that resolves 36 color chips into one of 12 personal color categories, including the bonus-round reevaluation for borderline cases. |
+| Area                                              | What I owned                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Diagnosis algorithm (4 → 12 categories)**       | Designed and implemented the 9-step combinatorial logic that resolves 36 color chips into one of 12 personal color categories, including the bonus-round reevaluation for borderline cases.                                                                                                                                                                     |
 | **Internationalization (next-i18next migration)** | Drove the decision (informed by GA4 international traffic signal), evaluated alternatives, and migrated the codebase to an SSR-compatible i18n architecture with namespace splitting. Write-up: [next-i18next migration wiki](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>). |
-| **SEO metadata layer** | Built locale-aware `<head>`, Open Graph, structured data, and sitemap strategy that put the service on Google's first page for the target Korean keyword. |
-| **Taxonomy & content** | Expanded the personal color taxonomy from 4 seasonal types to 12 sub-categories, including palettes and per-category descriptive copy used in both the algorithm and the result page. |
+| **SEO metadata layer**                            | Built locale-aware `<head>`, Open Graph, structured data, and sitemap strategy that put the service on Google's first page for the target Korean keyword.                                                                                                                                                                                                       |
+| **Taxonomy & content**                            | Expanded the personal color taxonomy from 4 seasonal types to 12 sub-categories, including palettes and per-category descriptive copy used in both the algorithm and the result page.                                                                                                                                                                           |
 
 Everything below describes the system; this section is the only part claiming ownership.
 
@@ -50,18 +54,21 @@ Everything below describes the system; this section is the only part claiming ow
 The original product offered the four classical seasonal categories (spring / summer / fall / winter). I expanded the taxonomy to **12 sub-categories** (each season split along hue, value, and chroma axes), then designed a 9-step diagnosis that resolves to one of those 12 deterministically and quickly.
 
 **Constraints**
+
 - Must run entirely client-side (no inference server, no per-request cost).
 - Must finish in ≤ 2 minutes for a casual mobile user.
 - Must be deterministic given the same inputs (no ML, no randomness in result).
 - Must keep drop-off low across nine sequential decisions.
 
 **Approach**
-- **Decision tree over 36 curated chips.** Each of the 9 steps presents a small subset chosen for **maximum information gain** against the *surviving* candidate set, not the full set. Earlier steps prune broad axes (warm vs. cool); later steps disambiguate sub-categories within a surviving season.
+
+- **Decision tree over 36 curated chips.** Each of the 9 steps presents a small subset chosen for **maximum information gain** against the _surviving_ candidate set, not the full set. Earlier steps prune broad axes (warm vs. cool); later steps disambiguate sub-categories within a surviving season.
 - **No step maps directly to a category.** A step constrains the candidate set; the 12-category result is the intersection after all 9 steps.
-- **Bonus reevaluation round.** When the surviving set after 9 steps is non-singleton, a bonus step runs hand-picked chips designed to discriminate between *exactly* the remaining 2–3 candidates. This was the highest-leverage change for accuracy without lengthening the median session.
+- **Bonus reevaluation round.** When the surviving set after 9 steps is non-singleton, a bonus step runs hand-picked chips designed to discriminate between _exactly_ the remaining 2–3 candidates. This was the highest-leverage change for accuracy without lengthening the median session.
 - **Chip selection** was iterated against pilot session data, not chosen visually.
 
 **Outcome**
+
 - 12-category resolution at **91.5% completion rate** across 83K+ sessions since launch.
 - Zero server-side inference cost. Algorithm ships in the client bundle.
 
@@ -118,13 +125,13 @@ sequenceDiagram
 
 ## Key Engineering Decisions
 
-| Decision | Chose | Rejected | Why | Tradeoff accepted |
-| --- | --- | --- | --- | --- |
-| Rendering model | **SSR** (Next.js) | SSG, CSR | Per-locale meta and per-result OG tags must be crawlable | Cold-start latency on serverless |
-| Backend | **Firebase** (Hosting + Storage + Realtime DB) | Self-hosted Node + Postgres | Zero ops, free-tier headroom at our traffic, fast iteration with a small team | Vendor lock-in; fan-out and egress cost would dominate at higher scale |
-| Client state | **Recoil** | Redux, Zustand | Atom-level granularity fits a 9-step flow where each step owns local state but several derived selectors depend on the running candidate set | Recoil's maintenance trajectory is uncertain |
-| i18n | **next-i18next** | next-intl, custom | Mature SSR story, namespace splitting that keeps per-route payloads small, drop-in for the existing Pages-router code | Heavier configuration than next-intl |
-| Result inference | **Client-side decision tree** | Server-side classifier, ML model | Deterministic, free to run, no PII leaves the device beyond the photo the user already uploaded | No room for personalization based on cross-session data |
+| Decision         | Chose                                          | Rejected                         | Why                                                                                                                                          | Tradeoff accepted                                                      |
+| ---------------- | ---------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Rendering model  | **SSR** (Next.js)                              | SSG, CSR                         | Per-locale meta and per-result OG tags must be crawlable                                                                                     | Cold-start latency on serverless                                       |
+| Backend          | **Firebase** (Hosting + Storage + Realtime DB) | Self-hosted Node + Postgres      | Zero ops, free-tier headroom at our traffic, fast iteration with a small team                                                                | Vendor lock-in; fan-out and egress cost would dominate at higher scale |
+| Client state     | **Recoil**                                     | Redux, Zustand                   | Atom-level granularity fits a 9-step flow where each step owns local state but several derived selectors depend on the running candidate set | Recoil's maintenance trajectory is uncertain                           |
+| i18n             | **next-i18next**                               | next-intl, custom                | Mature SSR story, namespace splitting that keeps per-route payloads small, drop-in for the existing Pages-router code                        | Heavier configuration than next-intl                                   |
+| Result inference | **Client-side decision tree**                  | Server-side classifier, ML model | Deterministic, free to run, no PII leaves the device beyond the photo the user already uploaded                                              | No room for personalization based on cross-session data                |
 
 ## Technical Challenges & Learnings
 
@@ -135,7 +142,7 @@ The diagnosis is a constrained search over 12 candidate categories using 9 binar
 - **Step ordering matters.** Putting a high-information-gain step too early collapses the candidate set, leaving later steps redundant. Putting it too late means later steps waste user attention on a question whose answer is already implied. I ordered steps to keep entropy of the surviving set roughly even across the session.
 - **Borderline cases hurt accuracy more than length hurts drop-off.** Adding a bonus reevaluation round (only triggered when the surviving set is non-singleton) traded ~10 seconds of median session time on borderline users for a measurable accuracy gain on the population the original 9 steps couldn't disambiguate.
 
-**Learning.** Treat the diagnosis as a decision tree against a *surviving* candidate set, not a classifier mapping (chip → category). The chip selection problem then becomes information-gain on the live subset, which is a much sharper formulation.
+**Learning.** Treat the diagnosis as a decision tree against a _surviving_ candidate set, not a classifier mapping (chip → category). The chip selection problem then becomes information-gain on the live subset, which is a much sharper formulation.
 
 ### 2. Internationalization as a data-driven product decision
 
@@ -145,7 +152,7 @@ GA4 surfaced a non-trivial fraction of overseas sessions early in the service's 
 
 ### 3. SEO to Google's first page
 
-Ranking a free Korean-language service on Google's first page for *"퍼스널컬러 테스트"* required treating SEO as engineering, not marketing:
+Ranking a free Korean-language service on Google's first page for _"퍼스널컬러 테스트"_ required treating SEO as engineering, not marketing:
 
 - **Per-locale `<head>` and Open Graph** generated at SSR time so each locale is independently crawlable.
 - **Structured data** so Google understands the page as a tool, not an article.
@@ -164,17 +171,17 @@ Running a real service exposed tradeoffs that aren't obvious from a tutorial:
 
 ## Tech Stack
 
-| Layer | Choice |
-| --- | --- |
-| Framework | Next.js 14 (Pages router, SSR) |
-| Language | TypeScript |
-| Styling | styled-components |
-| State | Recoil |
-| Hosting / Backend | Firebase Hosting, Storage, Realtime DB |
-| i18n | next-i18next |
-| Monitoring | Sentry (errors) + GA4 (product) |
-| CI/CD | GitHub Actions → Firebase CLI |
-| Misc | Spline (3D landing), html2canvas (result share), Kakao SDK |
+| Layer             | Choice                                                     |
+| ----------------- | ---------------------------------------------------------- |
+| Framework         | Next.js 14 (Pages router, SSR)                             |
+| Language          | TypeScript                                                 |
+| Styling           | styled-components                                          |
+| State             | Recoil                                                     |
+| Hosting / Backend | Firebase Hosting, Storage, Realtime DB                     |
+| i18n              | next-i18next                                               |
+| Monitoring        | Sentry (errors) + GA4 (product)                            |
+| CI/CD             | GitHub Actions → Firebase CLI                              |
+| Misc              | Spline (3D landing), html2canvas (result share), Kakao SDK |
 
 ## Deployment & Observability
 
