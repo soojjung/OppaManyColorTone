@@ -3,7 +3,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const { i18n } = require('./next-i18next.config.js');
 
 const nextConfig = {
-  pageExtensions: ['page.tsx'],
+  pageExtensions: ['page.tsx', 'page.ts'],
   reactStrictMode: true,
   compiler: {
     styledComponents: true,
@@ -23,6 +23,11 @@ const nextConfig = {
     ],
   },
   i18n,
+  experimental: {
+    outputFileTracingIncludes: {
+      '/**/*': ['./next-i18next.config.js', './public/locales/**/*'],
+    },
+  },
 };
 
 const sentryWebpackPluginOptions = {

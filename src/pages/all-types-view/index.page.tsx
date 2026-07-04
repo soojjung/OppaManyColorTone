@@ -4,6 +4,7 @@ import { useTranslation } from 'next-i18next';
 
 import { GetServerSideProps } from 'next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import nextI18NextConfig from '@Root/next-i18next.config';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
@@ -18,11 +19,15 @@ const defaultLabelStyle = {
   fontFamily: "'Noto Sans KR', sans-serif",
 };
 
+const DEFAULT_SELECTED_INDEX = color.findIndex(
+  ({ type }) => type === 'springbright'
+);
+
 const AllTypesView = () => {
   const { t } = useTranslation('common');
 
   const [selectedIndex, setSelectedIndex] = useState<number | undefined>(
-    undefined
+    DEFAULT_SELECTED_INDEX
   );
   const [hoveredIndex, setHoveredIndex] = useState<number | undefined>(
     undefined
@@ -90,6 +95,19 @@ const AllTypesView = () => {
           </S.ColorTypeTitle>
 
           <Tag colorType={colorType} tags={resultColorData[colorType].tags} />
+
+          <S.CelebrityCard borderColor={color[selectedIndex].textColor}>
+            <S.CelebrityImage
+              src={resultColorData[colorType].celebrities[0].imageURL}
+              alt={t(`${colorType}.celebrities.0`)}
+              width={96}
+              height={96}
+            />
+            <S.CelebrityName>
+              {t(`${colorType}.celebrities.0`)}
+            </S.CelebrityName>
+          </S.CelebrityCard>
+
           <S.PaletteGrid>
             {resultColorData[colorType].gridColors.map(
               (backgroundColor, index) => (
@@ -111,7 +129,7 @@ const AllTypesView = () => {
 export const getServerSideProps: GetServerSideProps = async ({ locale }) => {
   return {
     props: {
-      ...(await serverSideTranslations(locale ?? 'en', ['common'])),
+      ...(await serverSideTranslations(locale ?? 'en', ['common'], nextI18NextConfig)),
     },
   };
 };
