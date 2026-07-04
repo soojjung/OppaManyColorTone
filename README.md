@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://omct.web.app/" rel="noopener" target="_blank"><img src="./readme/omct-thumbnail.png" alt="Personal Color Self-Diagnosis Service"></a>
+  <a href="https://omct.web.app/en" rel="noopener" target="_blank"><img src="./readme/omct-thumbnail-en.png" alt="Personal Color Self-Diagnosis Service"></a>
 </p>
 
 # Personal Color Self-Diagnosis Service
@@ -235,9 +235,9 @@ yarn lint    # eslint
 - [Error Handling Design](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/1.-%EC%97%90%EB%9F%AC-%ED%95%B8%EB%93%A4%EB%A7%81-%EB%94%94%EC%9E%90%EC%9D%B8)
 - [Deployment Automation with GitHub Actions](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/2.-Github-Actions%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%B0%B0%ED%8F%AC-%EC%9E%90%EB%8F%99%ED%99%94)
 - [Project Folder Structure](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/3.-OMCT-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0)
-- [Internationalization (next-i18next)](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>)
-- [AI Color Recommendation — architecture, prompt, routing](./docs/domain/ai-color-recommendation.md)
-- [Personal Color Algorithm — 12-type diagnosis internals](./docs/domain/personal-color-algorithm.md)
+- [Internationalization (next-i18next)](./docs/en/i18n-next-i18next.md)
+- [AI Color Recommendation — architecture, prompt, routing](./docs/en/ai-color-recommendation.md)
+- [Personal Color Algorithm — 12-type diagnosis internals](./docs/en/personal-color-algorithm.md)
 
 ---
 
