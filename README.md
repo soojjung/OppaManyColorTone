@@ -8,7 +8,7 @@ A free, photo-based web service that diagnoses a user's personal color in under 
 
 - **Live:** https://omct.web.app/
 - **Organization:** https://github.com/SaekKkanDa/OppaManyColorTone
-- **Stack:** Next.js (SSR) · TypeScript · Recoil · Firebase (Hosting, Storage, Realtime DB) · next-i18next · Sentry · GitHub Actions
+- **Stack:** Next.js (SSR) · TypeScript · Recoil · Firebase (Hosting, Storage, Realtime DB, Firestore, Cloud Functions v2) · OpenAI GPT‑4o Vision · next-i18next · Sentry · GitHub Actions
 
 ### Demo
 
@@ -44,6 +44,7 @@ These numbers were earned, not seeded — there is no paid acquisition. Organic 
 | **Internationalization (next-i18next migration)** | Drove the decision (informed by GA4 international traffic signal), evaluated alternatives, and migrated the codebase to an SSR-compatible i18n architecture with namespace splitting. Write-up: [next-i18next migration wiki](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>). |
 | **SEO metadata layer**                            | Built locale-aware `<head>`, Open Graph, structured data, and sitemap strategy that put the service on Google's first page for the target Korean keyword.                                                                                                                                                                                                       |
 | **Taxonomy & content**                            | Expanded the personal color taxonomy from 4 seasonal types to 12 sub-categories, including palettes and per-category descriptive copy used in both the algorithm and the result page.                                                                                                                                                                           |
+| **AI color recommendation (GPT‑4o Vision)**       | Designed and shipped an optional recommendation feature for borderline chip choices. Hybrid model routing sends most requests to gpt‑4o‑mini and falls back to gpt‑4o only when confidence is low, keeping per-diagnosis cost near-zero at typical volume. Explicit consent gate, server-authoritative rate limit on Firestore, and quota refunds on failure paths. Deployed to production behind a feature flag pending live-user validation. Details: [ai-color-recommendation.md](./docs/domain/ai-color-recommendation.md). |
 
 Everything below describes the system; this section is the only part claiming ownership.
 
@@ -71,6 +72,33 @@ The original product offered the four classical seasonal categories (spring / su
 
 - 12-category resolution at **91.5% completion rate** across 83K+ sessions since launch.
 - Zero server-side inference cost. Algorithm ships in the client bundle.
+
+---
+
+## AI Color Recommendation — Hybrid GPT‑4o Vision Routing
+
+The 12-category diagnosis stays fully client-side and deterministic. What it can't do is help a user hesitating between two similarly plausible chips — the rule-based flow has already narrowed the surviving set as much as pre-committed logic allows. AI recommendation is an **optional, per-question assist** for that moment: given the user's uploaded photo and the four current chips, GPT‑4o Vision returns one pick with a short reasoning.
+
+**Constraints**
+
+- Cost per diagnosis cannot rise materially. GPT‑4o is ~15–20× the token cost of GPT‑4o‑mini; a naive "always 4o" approach was a non-starter.
+- Explicit consent is required before the photo leaves the client for OpenAI — a distinct data flow from the existing Firebase Storage upload.
+- Failures must not silently consume the user's per-session quota (10 calls / session).
+- Must ship behind a flag so live rollout is a config change, not a redeploy.
+- Base diagnosis must remain fully functional if AI is unavailable — this is an assist, not a replacement.
+
+**Approach**
+
+- **Hybrid model routing.** Requests hit **gpt‑4o‑mini** first. The response includes a self-reported confidence score; only when confidence falls below the threshold does the API re-issue the same request against **gpt‑4o**. Most requests resolve at the mini price point.
+- **Prompt engineering against model priors.** GPT‑4o Vision biases toward warm-tone identifications on Korean skin out of the box. The system prompt frames the task as _relative_ comparison across the four options, embeds an undertone-first methodology, and injects a Korean cool-tone prior — tuned against a hand-labeled pilot set before shipping.
+- **Server-authoritative rate limiting.** Firestore stores per-session usage. The API refunds the quota on failure paths (no face detected, upstream 5xx, internal error) so a retry after a network blip doesn't double-charge the user.
+- **Explicit consent snackbar** on first use, persisted in localStorage. No AI call is made without it.
+- **Reproducibility.** `temperature: 0, seed: 42` for stable outputs across identical inputs — regressions in the prompt become detectable in the pilot set.
+
+**Outcome**
+
+- Shipped to production behind `NEXT_PUBLIC_ENABLE_AI_RECOMMEND`. Off by default pending live cost & accuracy validation on real user photos.
+- Zod-validated request/response contract with a typed error taxonomy (`NO_FACE_DETECTED`, `RATE_LIMITED`, `AI_UNAVAILABLE`, `INTERNAL_ERROR`). Full architecture and prompt design in [`docs/domain/ai-color-recommendation.md`](./docs/domain/ai-color-recommendation.md).
 
 ---
 
@@ -132,6 +160,7 @@ sequenceDiagram
 | Client state     | **Recoil**                                     | Redux, Zustand                   | Atom-level granularity fits a 9-step flow where each step owns local state but several derived selectors depend on the running candidate set | Recoil's maintenance trajectory is uncertain                           |
 | i18n             | **next-i18next**                               | next-intl, custom                | Mature SSR story, namespace splitting that keeps per-route payloads small, drop-in for the existing Pages-router code                        | Heavier configuration than next-intl                                   |
 | Result inference | **Client-side decision tree**                  | Server-side classifier, ML model | Deterministic, free to run, no PII leaves the device beyond the photo the user already uploaded                                              | No room for personalization based on cross-session data                |
+| AI recommend routing | **Hybrid** (gpt‑4o‑mini → gpt‑4o on low confidence) | Always gpt‑4o, or single-model gpt‑4o‑mini | gpt‑4o alone is ~15–20× the token cost; mini alone leaves borderline cases undecided                                                        | Extra hop of latency on the (uncommon) fallback path                   |
 
 ## Technical Challenges & Learnings
 
@@ -177,7 +206,8 @@ Running a real service exposed tradeoffs that aren't obvious from a tutorial:
 | Language          | TypeScript                                                 |
 | Styling           | styled-components                                          |
 | State             | Recoil                                                     |
-| Hosting / Backend | Firebase Hosting, Storage, Realtime DB                     |
+| Hosting / Backend | Firebase Hosting, Storage, Realtime DB, Firestore, Cloud Functions v2 |
+| AI                | OpenAI GPT‑4o / GPT‑4o‑mini (Vision), hybrid routing       |
 | i18n              | next-i18next                                               |
 | Monitoring        | Sentry (errors) + GA4 (product)                            |
 | CI/CD             | GitHub Actions → Firebase CLI                              |
@@ -206,6 +236,8 @@ yarn lint    # eslint
 - [Deployment Automation with GitHub Actions](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/2.-Github-Actions%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%B0%B0%ED%8F%AC-%EC%9E%90%EB%8F%99%ED%99%94)
 - [Project Folder Structure](https://github.com/SaekKkanDa/OppaManyColorTone/wiki/3.-OMCT-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0)
 - [Internationalization (next-i18next)](<https://github.com/SaekKkanDa/OppaManyColorTone/wiki/4.-%EB%8B%A4%EA%B5%AD%EC%96%B4-%EC%A7%80%EC%9B%90-(next%E2%80%90i18next)>)
+- [AI Color Recommendation — architecture, prompt, routing](./docs/domain/ai-color-recommendation.md)
+- [Personal Color Algorithm — 12-type diagnosis internals](./docs/domain/personal-color-algorithm.md)
 
 ---
 
